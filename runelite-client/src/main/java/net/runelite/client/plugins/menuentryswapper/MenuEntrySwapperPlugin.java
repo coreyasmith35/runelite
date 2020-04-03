@@ -663,6 +663,42 @@ public class MenuEntrySwapperPlugin extends Plugin
 			swap("spellbook", option, target, index);
 			swap("perks", option, target, index);
 		}
+		else if (config.swapCorey() && (target.contains("mythical cape") || target.contains("guild trophy space")))
+		{
+			MenuEntry[] menuEntries = client.getMenuEntries();
+
+//			System.out.println("======== Before =========");
+//			System.out.println(option.toString());
+//			for (MenuEntry entry : menuEntries) {
+//				System.out.println(entry.toString());
+//			}
+//			System.out.println("========= Before ========");
+
+			if (option.equals("examine") && target.contains("guild trophy space"))
+			{
+				System.out.println("guild trophy space");
+				menuEntries[1].setType(1003);
+				swap("build", option, target, index);
+			}
+			else if (option.equals("teleport") && target.contains("mythical cape"))
+			{
+				menuEntry.setType(1003);
+				swap("remove", option, target, index);
+			}
+			else if (option.equals("examine") && target.contains("mythical cape"))
+			{
+				menuEntries[1].setType(1003);
+				swap("remove", option, target, index);
+			}
+
+//			System.out.println("======== After =========");
+//			System.out.println(option.toString());
+//			for (MenuEntry entry : menuEntries) {
+//				System.out.println(entry.toString());
+//			}
+//			System.out.println("========= After ========");
+		}
+
 		else if (config.swapJewelleryBox() && option.equals("teleport menu"))
 		{
 			swap("duel arena", option, target, index);

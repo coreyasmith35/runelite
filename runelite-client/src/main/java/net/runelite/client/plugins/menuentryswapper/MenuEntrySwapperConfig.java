@@ -32,6 +32,16 @@ import net.runelite.client.config.ConfigItem;
 public interface MenuEntrySwapperConfig extends Config
 {
 	@ConfigItem(
+			keyName = "swapCorey",
+			name = "Corey",
+			description = "Swap Corey :)."
+	)
+	default boolean swapCorey()
+	{
+		return true;
+	}
+
+	@ConfigItem(
 		position = -2,
 		keyName = "shiftClickCustomization",
 		name = "Customizable shift-click",
