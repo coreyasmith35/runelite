@@ -24,6 +24,8 @@
  */
 package net.runelite.client.plugins.skillcalculator.skills;
 
+import java.util.Collections;
+import java.util.Set;
 import net.runelite.api.ItemComposition;
 import net.runelite.client.game.ItemManager;
 
@@ -34,7 +36,7 @@ public interface SkillAction
 {
 	/**
 	 * Gets the name of this skill action, usually the item or object created, or the spell cast. This name may be
-	 * fetched via {@link ItemComposition#getName()} from some defined item ID or explicitly defined.
+	 * fetched via {@link ItemComposition#getMembersName()} from some defined item ID or explicitly defined.
 	 *
 	 * @param itemManager An {@link ItemManager item manager} instance.
 	 * @return The name of this skill action.
@@ -62,7 +64,7 @@ public interface SkillAction
 	 * value {@code 0} or greater.
 	 *
 	 * @return The item icon ID of this skill action, or {@code -1} if its icon should be represented using a sprite.
-	 * @see net.runelite.api.ItemID
+	 * @see net.runelite.api.gameval.ItemID
 	 * @see #getSprite()
 	 */
 	default int getIcon()
@@ -77,7 +79,7 @@ public interface SkillAction
 	 * value {@code 0} or greater.
 	 *
 	 * @return The sprite ID of this skill action, or {@code -1} if its icon should be represented using an item icon.
-	 * @see net.runelite.api.SpriteID
+	 * @see net.runelite.api.gameval.SpriteID
 	 * @see #getIcon()
 	 */
 	default int getSprite()
@@ -86,13 +88,19 @@ public interface SkillAction
 	}
 
 	/**
-	 * Returns {@code true} if this skill action is not boosted by any {@link SkillBonus skill bonuses}, {@code false}
-	 * otherwise.
+	 * Returns {@code true} if this skill action is affected by the specified {@link SkillBonus skill bonus}, {@code false} otherwise.
 	 *
-	 * @return {@code true} if this skill action is unaffected by skill bonuses, {@code false} otherwise.
+	 * @return {@code true} if this skill action is affected by the specified skill bonus, {@code false} otherwise.
 	 */
-	default boolean isIgnoreBonus()
+	default boolean isBonusApplicable(SkillBonus bonus)
 	{
-		return false;
+		return !getExcludedSkillBonuses().contains(bonus);
+	}
+
+	boolean isMembers(final ItemManager itemManager);
+
+	default Set<? extends SkillBonus> getExcludedSkillBonuses()
+	{
+		return Collections.emptySet();
 	}
 }

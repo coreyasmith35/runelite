@@ -27,6 +27,7 @@ package net.runelite.client.plugins.boosts;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
+import net.runelite.client.config.Notification;
 
 @ConfigGroup("boosts")
 public interface BoostsConfig extends Config
@@ -48,8 +49,8 @@ public interface BoostsConfig extends Config
 
 	@ConfigItem(
 		keyName = "displayBoosts",
-		name = "Display Boosts",
-		description = "Configures which skill boosts to display",
+		name = "Display boosts",
+		description = "Configures which skill boosts to display.",
 		position = 1
 	)
 	default DisplayBoosts displayBoosts()
@@ -59,8 +60,8 @@ public interface BoostsConfig extends Config
 
 	@ConfigItem(
 		keyName = "relativeBoost",
-		name = "Use Relative Boosts",
-		description = "Configures whether or not relative boost is used",
+		name = "Show relative boosts",
+		description = "Configures whether or not relative boost is used.",
 		position = 2
 	)
 	default boolean useRelativeBoost()
@@ -70,8 +71,8 @@ public interface BoostsConfig extends Config
 
 	@ConfigItem(
 		keyName = "displayIndicators",
-		name = "Display as infoboxes",
-		description = "Configures whether or not to display the boost as infoboxes",
+		name = "Display infoboxes",
+		description = "Configures whether to display boost infoboxes.",
 		position = 3
 	)
 	default boolean displayInfoboxes()
@@ -80,10 +81,32 @@ public interface BoostsConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "displayPanel",
+		name = "Display panel",
+		description = "Configures whether to display the boost panel.",
+		position = 3
+	)
+	default boolean displayPanel()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "compactDisplay",
+		name = "Compact display",
+		description = "Displays skill boosts in a more compact panel.",
+		position = 4
+	)
+	default boolean compactDisplay()
+	{
+		return false;
+	}
+
+	@ConfigItem(
 		keyName = "displayNextBuffChange",
 		name = "Next buff change",
-		description = "Configures whether or not to display when the next buffed stat change will be",
-		position = 4
+		description = "Configures whether or not to display when the next buffed stat change will be.",
+		position = 10
 	)
 	default DisplayChangeMode displayNextBuffChange()
 	{
@@ -93,8 +116,8 @@ public interface BoostsConfig extends Config
 	@ConfigItem(
 		keyName = "displayNextDebuffChange",
 		name = "Next debuff change",
-		description = "Configures whether or not to display when the next debuffed stat change will be",
-		position = 5
+		description = "Configures whether or not to display when the next debuffed stat change will be.",
+		position = 11
 	)
 	default DisplayChangeMode displayNextDebuffChange()
 	{
@@ -104,8 +127,8 @@ public interface BoostsConfig extends Config
 	@ConfigItem(
 		keyName = "boostThreshold",
 		name = "Boost threshold",
-		description = "The threshold at which boosted levels will be displayed in a different color. A value of 0 will disable the feature.",
-		position = 6
+		description = "Number of levels above your base level at which boosted levels will be displayed in a different color.",
+		position = 12
 	)
 	default int boostThreshold()
 	{
@@ -115,11 +138,11 @@ public interface BoostsConfig extends Config
 	@ConfigItem(
 		keyName = "notifyOnBoost",
 		name = "Notify on boost threshold",
-		description = "Configures whether or not a notification will be sent for boosted stats.",
-		position = 7
+		description = "Configures whether or not a notification will be sent when boosted stats drain to the boost threshold.",
+		position = 13
 	)
-	default boolean notifyOnBoost()
+	default Notification notifyOnBoost()
 	{
-		return true;
+		return Notification.OFF;
 	}
 }

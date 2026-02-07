@@ -24,6 +24,10 @@
  */
 package net.runelite.api;
 
+/**
+ * @see net.runelite.api.gameval.SpotanimID
+ */
+@Deprecated
 public final class GraphicID
 {
 	public static final int WINE_MAKE = 47;
@@ -51,6 +55,12 @@ public final class GraphicID
 	public static final int STAFF_OF_THE_DEAD = 1228;
 	public static final int FLYING_FISH = 1387;
 	public static final int GRANITE_CANNONBALL = 1443;
+	public static final int MELEE_NYLO_DEATH = 1562;
+	public static final int RANGE_NYLO_DEATH = 1563;
+	public static final int MAGE_NYLO_DEATH = 1564;
+	public static final int MELEE_NYLO_EXPLOSION = 1565;
+	public static final int RANGE_NYLO_EXPLOSION = 1566;
+	public static final int MAGE_NYLO_EXPLOSION = 1567;
 	public static final int GRAPHICS_OBJECT_ROCKFALL = 1727;
 	public static final int ZALCANO_PROJECTILE_FIREBALL = 1728;
 	public static final int CANNONBALL_OR = 2018;

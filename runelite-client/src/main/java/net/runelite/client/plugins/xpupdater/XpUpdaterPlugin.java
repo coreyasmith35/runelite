@@ -43,17 +43,17 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import okhttp3.Call;
 import okhttp3.Callback;
-import okhttp3.FormBody;
 import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
+import okhttp3.FormBody;
 import okhttp3.Response;
 
 @PluginDescriptor(
 	name = "XP Updater",
 	description = "Automatically updates your stats on external xptrackers when you log out",
-	tags = {"cml", "crystalmathlabs", "templeosrs", "temple", "wom", "wiseoldman", "wise old man", "external", "integration"},
+	tags = {"cml", "crystalmathlabs", "runetracker", "templeosrs", "temple", "wom", "wiseoldman", "wise old man", "external", "integration"},
 	enabledByDefault = false
 )
 @Slf4j
@@ -102,7 +102,7 @@ public class XpUpdaterPlugin extends Plugin
 				fetchXp = true;
 			}
 		}
-		else if (state == GameState.LOGIN_SCREEN)
+		else if (state == GameState.LOGIN_SCREEN || state == GameState.HOPPING)
 		{
 			Player local = client.getLocalPlayer();
 			if (local == null)
@@ -137,7 +137,7 @@ public class XpUpdaterPlugin extends Plugin
 		username = username.replace(" ", "_");
 		updateCml(username, worldTypes);
 		updateTempleosrs(accountHash, username, worldTypes);
-		updateWom(username, worldTypes);
+		updateWom(accountHash, username, worldTypes);
 	}
 
 	private void updateCml(String username, EnumSet<WorldType> worldTypes)
@@ -145,7 +145,9 @@ public class XpUpdaterPlugin extends Plugin
 		if (config.cml()
 			&& !worldTypes.contains(WorldType.SEASONAL)
 			&& !worldTypes.contains(WorldType.DEADMAN)
-			&& !worldTypes.contains(WorldType.NOSAVE_MODE))
+			&& !worldTypes.contains(WorldType.NOSAVE_MODE)
+			&& !worldTypes.contains(WorldType.FRESH_START_WORLD)
+			&& !worldTypes.contains(WorldType.TOURNAMENT_WORLD))
 		{
 			HttpUrl url = new HttpUrl.Builder()
 				.scheme("https")
@@ -170,43 +172,48 @@ public class XpUpdaterPlugin extends Plugin
 		if (config.templeosrs()
 			&& !worldTypes.contains(WorldType.SEASONAL)
 			&& !worldTypes.contains(WorldType.DEADMAN)
-			&& !worldTypes.contains(WorldType.NOSAVE_MODE))
+			&& !worldTypes.contains(WorldType.NOSAVE_MODE)
+			&& !worldTypes.contains(WorldType.TOURNAMENT_WORLD))
 		{
-			HttpUrl url = new HttpUrl.Builder()
+			HttpUrl.Builder url = new HttpUrl.Builder()
 				.scheme("https")
 				.host("templeosrs.com")
 				.addPathSegment("php")
 				.addPathSegment("add_datapoint.php")
 				.addQueryParameter("player", username)
-				.addQueryParameter("accountHash", Long.toString(accountHash))
-				.build();
+				.addQueryParameter("accountHash", Long.toString(accountHash));
+
+			if (worldTypes.contains(WorldType.FRESH_START_WORLD))
+			{
+				url.addQueryParameter("worldType", "fsw");
+			}
 
 			Request request = new Request.Builder()
 				.header("User-Agent", "RuneLite")
-				.url(url)
+				.url(url.build())
 				.build();
 
 			sendRequest("TempleOSRS", request);
 		}
 	}
 
-	private void updateWom(String username, EnumSet<WorldType> worldTypes)
+	private void updateWom(long accountHash, String username, EnumSet<WorldType> worldTypes)
 	{
 		if (config.wiseoldman()
 			&& !worldTypes.contains(WorldType.DEADMAN)
-			&& !worldTypes.contains(WorldType.NOSAVE_MODE))
+			&& !worldTypes.contains(WorldType.NOSAVE_MODE)
+			&& !worldTypes.contains(WorldType.TOURNAMENT_WORLD))
 		{
-			String host = worldTypes.contains(WorldType.SEASONAL) ? "seasonal.wiseoldman.net" : "wiseoldman.net";
 			HttpUrl url = new HttpUrl.Builder()
 				.scheme("https")
-				.host(host)
-				.addPathSegment("api")
+				.host("api.wiseoldman.net")
+				.addPathSegment(worldTypes.contains(WorldType.SEASONAL) ? "league" : "v2")
 				.addPathSegment("players")
-				.addPathSegment("track")
+				.addPathSegment(username)
 				.build();
 
 			RequestBody formBody = new FormBody.Builder()
-				.add("username", username)
+				.add("accountHash", Long.toString(accountHash))
 				.build();
 
 			Request request = new Request.Builder()

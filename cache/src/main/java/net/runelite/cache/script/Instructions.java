@@ -52,11 +52,11 @@ public class Instructions implements Opcodes
 		add(IF_ICMPGE, "if_icmpge");
 		add(ILOAD, "iload");
 		add(ISTORE, "istore");
-		add(SLOAD, "sload");
-		add(SSTORE, "sstore");
+		add(OLOAD, "oload");
+		add(OSTORE, "ostore");
 		add(JOIN_STRING, "join_string");
 		add(POP_INT, "pop_int");
-		add(POP_STRING, "pop_string");
+		add(POP_OBJECT, "pop_object");
 		add(INVOKE, "invoke");
 		add(GET_VARC_INT, "get_varc_int");
 		add(SET_VARC_INT, "set_varc_int");
@@ -68,6 +68,7 @@ public class Instructions implements Opcodes
 		add(GET_VARC_STRING, "get_varc_string");
 		add(SET_VARC_STRING, "set_varc_string");
 		add(SWITCH, "switch");
+		add(PUSH_NULL, "push_null");
 		add(GET_VARCLANSETTING, "get_varclansetting");
 		add(GET_VARCLAN, "get_varclan");
 		add(CC_CREATE, "cc_create");
@@ -575,6 +576,17 @@ public class Instructions implements Opcodes
 		add(MEC_SPRITE, "mec_sprite");
 		add(WORLDMAP_ELEMENT, "worldmap_element");
 		add(WORLDMAP_ELEMENTCOORD, "worldmap_elementcoord");
+		add(DB_FIND_WITH_COUNT, "db_find_with_count");
+		add(DB_FINDNEXT, "db_findnext");
+		add(DB_GETFIELD, "db_getfield");
+		add(DB_GETFIELDCOUNT, "db_getfieldcount");
+		add(DB_FINDALL_WITH_COUNT, "db_findall_with_count");
+		add(DB_GETROWTABLE, "db_getrowtable");
+		add(DB_GETROW, "db_getrow");
+		add(DB_FIND_FILTER_WITH_COUNT, "db_find_filter_with_count");
+		add(DB_FIND, "db_find");
+		add(DB_FINDALL, "db_findall");
+		add(DB_FIND_FILTER, "db_find_filter");
 	}
 
 	protected void add(int opcode, String name)

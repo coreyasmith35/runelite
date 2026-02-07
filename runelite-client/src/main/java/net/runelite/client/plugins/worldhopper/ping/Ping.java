@@ -27,8 +27,13 @@ package net.runelite.client.plugins.worldhopper.ping;
 import com.google.common.base.Charsets;
 import com.google.common.primitives.Bytes;
 import com.sun.jna.Memory;
+import com.sun.jna.Native;
 import com.sun.jna.Pointer;
+import com.sun.jna.platform.win32.WinNT;
+import com.sun.jna.ptr.IntByReference;
+import java.io.FileDescriptor;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -48,7 +53,13 @@ public class Ping
 
 	private static short seq;
 
+	@Deprecated
 	public static int ping(World world)
+	{
+		return ping(world, false);
+	}
+
+	public static int ping(World world, boolean useTcpPing)
 	{
 		InetAddress inetAddress;
 		try
@@ -57,7 +68,7 @@ public class Ping
 		}
 		catch (UnknownHostException ex)
 		{
-			log.warn("error resolving host for world ping", ex);
+			log.debug("error resolving host for world ping", ex);
 			return -1;
 		}
 
@@ -72,14 +83,19 @@ public class Ping
 			switch (OSType.getOSType())
 			{
 				case Windows:
-					return windowsPing(inetAddress);
+					int p = windowsPing(inetAddress);
+					if (p == -1 && useTcpPing)
+					{
+						p = tcpPing(inetAddress);
+					}
+					return p;
 				case MacOS:
 				case Linux:
 					try
 					{
 						return icmpPing(inetAddress, OSType.getOSType() == OSType.MacOS);
 					}
-					catch (Exception ex)
+					catch (IOException ex)
 					{
 						log.debug("error during icmp ping", ex);
 						return tcpPing(inetAddress);
@@ -136,9 +152,16 @@ public class Ping
 		{
 			Timeval tv = new Timeval();
 			tv.tv_sec = TIMEOUT / 1000;
+			tv.write();
+
 			if (libc.setsockopt(sock, libc.SOL_SOCKET, libc.SO_RCVTIMEO, tv.getPointer(), tv.size()) < 0)
 			{
 				throw new IOException("failed to set SO_RCVTIMEO");
+			}
+
+			if (libc.setsockopt(sock, libc.SOL_SOCKET, libc.SO_SNDTIMEO, tv.getPointer(), tv.size()) < 0)
+			{
+				throw new IOException("failed to set SO_SNDTIMEO");
 			}
 
 			short seqno = seq++;
@@ -179,40 +202,52 @@ public class Ping
 				return -1;
 			}
 
-			int rlen = libc.recvfrom(sock, response, size, 0, null, null);
-			long end = System.nanoTime();
-			if (rlen <= 0)
+			while (true)
 			{
-				return -1;
+				if ((System.nanoTime() - start) / 1_000_000 > TIMEOUT)
+				{
+					log.debug("timeout elapsed checking for echo reply");
+					break;
+				}
+
+				int rlen = libc.recvfrom(sock, response, size, 0, null, null);
+				long end = System.nanoTime();
+				if (rlen <= 0)
+				{
+					log.debug("recvfrom() error: len {} errno {}", rlen, Native.getLastError());
+					break;
+				}
+
+				int icmpHeaderOffset = 0;
+				if (includeIpHeader)
+				{
+					int ihl = response.getByte(0) & 0xf;
+					icmpHeaderOffset = ihl << 2; // to bytes
+				}
+
+				if (icmpHeaderOffset + 7 >= rlen)
+				{
+					log.warn("packet too short (received {} bytes but icmp header offset is {})", rlen, icmpHeaderOffset);
+					continue;
+				}
+
+				if (response.getByte(icmpHeaderOffset) != 0) // ICMP type - echo reply
+				{
+					log.debug("non-echo reply");
+					continue;
+				}
+
+				short seq = (short) (((response.getByte(icmpHeaderOffset + 6) & 0xff) << 8) | response.getByte(icmpHeaderOffset + 7) & 0xff);
+				if (seqno != seq)
+				{
+					log.debug("sequence number mismatch ({} != {})", seqno, seq);
+					continue;
+				}
+
+				return (int) ((end - start) / 1_000_000);
 			}
 
-			int icmpHeaderOffset = 0;
-			if (includeIpHeader)
-			{
-				int ihl = response.getByte(0) & 0xf;
-				icmpHeaderOffset = ihl << 2; // to bytes
-			}
-
-			if (icmpHeaderOffset + 7 >= rlen)
-			{
-				log.warn("packet too short (received {} bytes but icmp header offset is {})", rlen, icmpHeaderOffset);
-				return -1;
-			}
-
-			if (response.getByte(icmpHeaderOffset) != 0) // ICMP type - echo reply
-			{
-				log.warn("non-echo reply");
-				return -1;
-			}
-
-			short seq = (short) (((response.getByte(icmpHeaderOffset + 6) & 0xff) << 8) | response.getByte(icmpHeaderOffset + 7) & 0xff);
-			if (seqno != seq)
-			{
-				log.warn("sequence number mismatch ({} != {})", seqno, seq);
-				return -1;
-			}
-
-			return (int) ((end - start) / 1_000_000);
+			return -1;
 		}
 		finally
 		{
@@ -248,5 +283,59 @@ public class Ping
 			long end = System.nanoTime();
 			return (int) ((end - start) / 1000000L);
 		}
+	}
+
+	public static TCP_INFO_v0 getTcpInfo(FileDescriptor fd)
+	{
+		if (OSType.getOSType() != OSType.Windows)
+		{
+			return null;
+		}
+
+		int handle;
+		try
+		{
+			Field f = FileDescriptor.class.getDeclaredField("fd");
+			f.setAccessible(true);
+			handle = f.getInt(fd);
+		}
+		catch (NoSuchFieldException | IllegalAccessException ex)
+		{
+			log.debug(null, ex);
+			return null;
+		}
+
+		IntByReference tcpInfoVersion = new IntByReference(0); // Version 0 of TCP_INFO
+		TCP_INFO_v0 info = new TCP_INFO_v0();
+		IntByReference bytesReturned = new IntByReference();
+
+		Ws2_32 winsock = Ws2_32.INSTANCE;
+		int rc;
+		try
+		{
+			rc = winsock.WSAIoctl(
+				new WinNT.HANDLE(Pointer.createConstant(handle)),
+				Ws2_32.SIO_TCP_INFO,
+				tcpInfoVersion.getPointer(), Integer.BYTES,
+				info.getPointer(), info.size(),
+				bytesReturned,
+				Pointer.NULL,
+				Pointer.NULL
+			);
+		}
+		catch (UnsatisfiedLinkError ex)
+		{
+			// probably Windows 7
+			log.debug("WSAIoctl()", ex);
+			return null;
+		}
+		if (rc != 0)
+		{
+			log.debug("WSAIoctl(SIO_TCP_INFO) error"); // WSAGetLastError() seems to always be 0?
+			return null;
+		}
+
+		info.read();
+		return info;
 	}
 }

@@ -33,7 +33,6 @@ import lombok.NonNull;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
-import net.runelite.client.ui.overlay.OverlayPriority;
 
 public class ScreenMarkerOverlay extends Overlay
 {
@@ -45,9 +44,10 @@ public class ScreenMarkerOverlay extends Overlay
 	{
 		this.marker = marker;
 		this.screenMarkerRenderable = new ScreenMarkerRenderable();
-		setPosition(OverlayPosition.DETACHED);
+		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.ALWAYS_ON_TOP);
-		setPriority(OverlayPriority.HIGH);
+		setPriority(PRIORITY_HIGH);
+		setMovable(true);
 		setResizable(true);
 		setMinimumSize(16);
 		setResettable(false);

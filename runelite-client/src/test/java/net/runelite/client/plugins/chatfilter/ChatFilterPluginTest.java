@@ -98,8 +98,8 @@ public class ChatFilterPluginTest
 		MessageNode mockedMsgNode = mockMessageNode(sender);
 		when(client.getIntStack()).thenReturn(simulatedIntStack);
 		when(client.getIntStackSize()).thenReturn(simulatedIntStack.length);
-		when(client.getStringStack()).thenReturn(simulatedStringStack);
-		when(client.getStringStackSize()).thenReturn(simulatedStringStack.length);
+		when(client.getObjectStack()).thenReturn(simulatedStringStack);
+		when(client.getObjectStackSize()).thenReturn(simulatedStringStack.length);
 		when(client.getMessages()).thenReturn(messageTable);
 		when(messageTable.get(1)).thenReturn(mockedMsgNode);
 		return event;
@@ -191,6 +191,7 @@ public class ChatFilterPluginTest
 	{
 		when(chatFilterConfig.filterType()).thenReturn(ChatFilterType.CENSOR_WORDS);
 		when(chatFilterConfig.filteredWords()).thenReturn("filterme");
+		when(chatFilterConfig.stripAccents()).thenReturn(true);
 
 		chatFilterPlugin.updateFilteredPatterns();
 		assertEquals("plëäsë ******** plügïn", chatFilterPlugin.censorMessage("Blue", "plëäsë fïltërmë plügïn"));
@@ -211,6 +212,7 @@ public class ChatFilterPluginTest
 	{
 		when(chatFilterConfig.filterType()).thenReturn(ChatFilterType.CENSOR_WORDS);
 		when(chatFilterConfig.filteredWords()).thenReturn("plëäsë, filterme");
+		when(chatFilterConfig.stripAccents()).thenReturn(true);
 
 		chatFilterPlugin.updateFilteredPatterns();
 		assertEquals("****** ******** plügïn", chatFilterPlugin.censorMessage("Blue", "plëäsë fïltërmë plügïn"));
@@ -220,7 +222,7 @@ public class ChatFilterPluginTest
 	public void testMessageFromFriendIsFiltered()
 	{
 		when(chatFilterConfig.filterFriends()).thenReturn(true);
-		assertTrue(chatFilterPlugin.shouldFilterPlayerMessage("Iron Mammal"));
+		assertTrue(chatFilterPlugin.canFilterPlayer("Iron Mammal"));
 	}
 
 	@Test
@@ -228,7 +230,7 @@ public class ChatFilterPluginTest
 	{
 		when(client.isFriended("Iron Mammal", false)).thenReturn(true);
 		when(chatFilterConfig.filterFriends()).thenReturn(false);
-		assertFalse(chatFilterPlugin.shouldFilterPlayerMessage("Iron Mammal"));
+		assertFalse(chatFilterPlugin.canFilterPlayer("Iron Mammal"));
 	}
 
 	@Test
@@ -236,7 +238,7 @@ public class ChatFilterPluginTest
 	{
 		when(client.isFriended("B0aty", false)).thenReturn(false);
 		when(chatFilterConfig.filterFriendsChat()).thenReturn(true);
-		assertTrue(chatFilterPlugin.shouldFilterPlayerMessage("B0aty"));
+		assertTrue(chatFilterPlugin.canFilterPlayer("B0aty"));
 	}
 
 	@Test
@@ -244,21 +246,21 @@ public class ChatFilterPluginTest
 	{
 		when(friendsChatManager.findByName("B0aty")).thenReturn(mock(FriendsChatMember.class));
 		when(chatFilterConfig.filterFriendsChat()).thenReturn(false);
-		assertFalse(chatFilterPlugin.shouldFilterPlayerMessage("B0aty"));
+		assertFalse(chatFilterPlugin.canFilterPlayer("B0aty"));
 	}
 
 	@Test
 	public void testMessageFromSelfIsNotFiltered()
 	{
 		when(localPlayer.getName()).thenReturn("Swampletics");
-		assertFalse(chatFilterPlugin.shouldFilterPlayerMessage("Swampletics"));
+		assertFalse(chatFilterPlugin.canFilterPlayer("Swampletics"));
 	}
 
 	@Test
 	public void testMessageFromNonFriendNonFCIsFiltered()
 	{
 		when(client.isFriended("Woox", false)).thenReturn(false);
-		assertTrue(chatFilterPlugin.shouldFilterPlayerMessage("Woox"));
+		assertTrue(chatFilterPlugin.canFilterPlayer("Woox"));
 	}
 
 	@Test
@@ -267,8 +269,8 @@ public class ChatFilterPluginTest
 		when(chatFilterConfig.filteredNames()).thenReturn("Gamble [0-9]*");
 
 		chatFilterPlugin.updateFilteredPatterns();
-		assertTrue(chatFilterPlugin.shouldFilterByName("Gamble 1234"));
-		assertFalse(chatFilterPlugin.shouldFilterByName("Adam"));
+		assertTrue(chatFilterPlugin.isNameFiltered("Gamble 1234"));
+		assertFalse(chatFilterPlugin.isNameFiltered("Adam"));
 	}
 
 	@Test
@@ -332,7 +334,7 @@ public class ChatFilterPluginTest
 		chatFilterPlugin.updateFilteredPatterns();
 		ScriptCallbackEvent event = createCallbackEvent("Gamble 1234", "filterme", ChatMessageType.PUBLICCHAT);
 		chatFilterPlugin.onScriptCallbackEvent(event);
-		assertEquals("********", client.getStringStack()[client.getStringStackSize() - 1]);
+		assertEquals("********", client.getObjectStack()[client.getObjectStackSize() - 1]);
 	}
 
 	@Test
@@ -344,7 +346,7 @@ public class ChatFilterPluginTest
 		chatFilterPlugin.updateFilteredPatterns();
 		ScriptCallbackEvent event = createCallbackEvent("Adam", "please filterme plugin", ChatMessageType.PUBLICCHAT);
 		chatFilterPlugin.onScriptCallbackEvent(event);
-		assertEquals("please ******** plugin", client.getStringStack()[client.getStringStackSize() - 1]);
+		assertEquals("please ******** plugin", client.getObjectStack()[client.getObjectStackSize() - 1]);
 	}
 
 	@Test
@@ -356,7 +358,7 @@ public class ChatFilterPluginTest
 		chatFilterPlugin.updateFilteredPatterns();
 		ScriptCallbackEvent event = createCallbackEvent("Gamble 1234", "filterme", ChatMessageType.PUBLICCHAT);
 		chatFilterPlugin.onScriptCallbackEvent(event);
-		assertEquals(CENSOR_MESSAGE, client.getStringStack()[client.getStringStackSize() - 1]);
+		assertEquals(CENSOR_MESSAGE, client.getObjectStack()[client.getObjectStackSize() - 1]);
 	}
 
 	@Test
@@ -368,7 +370,7 @@ public class ChatFilterPluginTest
 		chatFilterPlugin.updateFilteredPatterns();
 		ScriptCallbackEvent event = createCallbackEvent("Adam", "please filterme plugin", ChatMessageType.PUBLICCHAT);
 		chatFilterPlugin.onScriptCallbackEvent(event);
-		assertEquals(CENSOR_MESSAGE, client.getStringStack()[client.getStringStackSize() - 1]);
+		assertEquals(CENSOR_MESSAGE, client.getObjectStack()[client.getObjectStackSize() - 1]);
 	}
 
 	@Test
@@ -391,7 +393,7 @@ public class ChatFilterPluginTest
 		chatFilterPlugin.onScriptCallbackEvent(event);
 
 		assertEquals(1, client.getIntStack()[client.getIntStackSize() - 3]);
-		assertEquals("testMessage", client.getStringStack()[client.getStringStackSize() - 1]);
+		assertEquals("testMessage", client.getObjectStack()[client.getObjectStackSize() - 1]);
 	}
 
 	@Test
@@ -406,7 +408,7 @@ public class ChatFilterPluginTest
 		chatFilterPlugin.onScriptCallbackEvent(event);
 
 		assertEquals(1, client.getIntStack()[client.getIntStackSize() - 3]);
-		assertEquals("testMessage (4)", client.getStringStack()[client.getStringStackSize() - 1]);
+		assertEquals("testMessage (4)", client.getObjectStack()[client.getObjectStackSize() - 1]);
 	}
 
 	@Test
@@ -435,7 +437,7 @@ public class ChatFilterPluginTest
 		chatFilterPlugin.onScriptCallbackEvent(event);
 
 		assertEquals(1, client.getIntStack()[client.getIntStackSize() - 3]);
-		assertEquals("<col=000000>testMessage</col> (4)", client.getStringStack()[client.getStringStackSize() - 1]);
+		assertEquals("<col=000000>testMessage</col> (4)", client.getObjectStack()[client.getObjectStackSize() - 1]);
 	}
 
 	@Test
@@ -450,5 +452,30 @@ public class ChatFilterPluginTest
 		ScriptCallbackEvent event = createCallbackEvent("<img=22>Lazark", "test", ChatMessageType.PUBLICCHAT);
 		chatFilterPlugin.onScriptCallbackEvent(event);
 		assertEquals(1, client.getIntStack()[client.getIntStackSize() - 3]); // not filtered
+	}
+
+	@Test
+	public void testLtGt()
+	{
+		when(chatFilterConfig.filteredWords()).thenReturn("f<ilte>r");
+
+		chatFilterPlugin.updateFilteredPatterns();
+
+		String message = chatFilterPlugin.censorMessage("Adam", "start f<lt>ilte<gt>r end");
+		assertEquals("start ******** end", message);
+	}
+
+	@Test
+	public void testSelfFilterChatbox()
+	{
+		when(chatFilterConfig.filteredWords()).thenReturn("test");
+		when(localPlayer.getName()).thenReturn("Logic Knot");
+
+		chatFilterPlugin.updateFilteredPatterns();
+
+		// messagenode names have nbsp but actor names do not
+		ScriptCallbackEvent event = createCallbackEvent("Logic\u00A0Knot", "test", ChatMessageType.PUBLICCHAT);
+		chatFilterPlugin.onScriptCallbackEvent(event);
+		assertEquals("test", client.getObjectStack()[client.getObjectStackSize() - 1]);
 	}
 }

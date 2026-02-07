@@ -74,7 +74,10 @@ public class MenuManager
 	 */
 	public void addManagedCustomMenu(WidgetMenuOption customMenuOption, Consumer<MenuEntry> callback)
 	{
-		managedMenuOptions.put(customMenuOption.getWidgetId(), customMenuOption);
+		for (int id : customMenuOption.getWidgetIds())
+		{
+			managedMenuOptions.put(id, customMenuOption);
+		}
 		customMenuOption.callback = callback;
 	}
 
@@ -85,7 +88,10 @@ public class MenuManager
 	 */
 	public void removeManagedCustomMenu(WidgetMenuOption customMenuOption)
 	{
-		managedMenuOptions.remove(customMenuOption.getWidgetId(), customMenuOption);
+		for (int id : customMenuOption.getWidgetIds())
+		{
+			managedMenuOptions.remove(id, customMenuOption);
+		}
 	}
 
 	private static boolean menuContainsCustomMenu(MenuEntry[] menuEntries, WidgetMenuOption customMenuOption)
@@ -106,7 +112,7 @@ public class MenuManager
 	@Subscribe
 	public void onMenuEntryAdded(MenuEntryAdded event)
 	{
-		if (client.getSpellSelected() || event.getType() != MenuAction.CC_OP.getId())
+		if (client.isWidgetSelected() || event.getType() != MenuAction.CC_OP.getId())
 		{
 			return;
 		}

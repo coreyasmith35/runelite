@@ -36,7 +36,7 @@ public interface ItemContainer extends Node
 	 * Get the item container id
 	 *
 	 * @return
-	 * @see InventoryID
+	 * @see net.runelite.api.gameval.InventoryID
 	 */
 	int getId();
 
@@ -63,7 +63,7 @@ public interface ItemContainer extends Node
 	 *
 	 * @param itemId
 	 * @return
-	 * @see ItemID
+	 * @see net.runelite.api.gameval.ItemID
 	 */
 	boolean contains(int itemId);
 
@@ -72,13 +72,28 @@ public interface ItemContainer extends Node
 	 *
 	 * @param itemId
 	 * @return
-	 * @see ItemID
+	 * @see net.runelite.api.gameval.ItemID
 	 */
 	int count(int itemId);
 
 	/**
-	 * Get the number of items in this item container. May include empty slots.
+	 * Get the number of slots in this item container. This includes empty slots.
+	 * For example for the player inventory it can be 28 even with no items in the inventory.
+	 * @see #count() to get the number of filled slots instead
 	 * @return
 	 */
 	int size();
+
+	/**
+	 * Get the total number of filled slots in the item container.
+	 * @return
+	 */
+	int count();
+
+	/**
+	 * Find the first index of an item in the container
+	 * @param itemId the item
+	 * @return the item index, or -1 if not found
+	 */
+	int find(int itemId);
 }

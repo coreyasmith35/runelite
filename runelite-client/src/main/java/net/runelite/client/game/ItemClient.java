@@ -24,6 +24,7 @@
  */
 package net.runelite.client.game;
 
+import com.google.gson.Gson;
 import com.google.gson.JsonParseException;
 import com.google.gson.reflect.TypeToken;
 import java.io.IOException;
@@ -35,9 +36,7 @@ import java.util.Map;
 import javax.inject.Inject;
 import javax.inject.Named;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.http.api.RuneLiteAPI;
 import net.runelite.http.api.item.ItemPrice;
-import net.runelite.http.api.item.ItemStats;
 import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -48,16 +47,19 @@ public class ItemClient
 {
 	private final OkHttpClient client;
 	private final HttpUrl apiBase, staticBase;
+	private final Gson gson;
 
 	@Inject
 	private ItemClient(OkHttpClient client,
 		@Named("runelite.api.base") HttpUrl apiBase,
-		@Named("runelite.static.base") HttpUrl staticBase
+		@Named("runelite.static.base") HttpUrl staticBase,
+		Gson gson
 	)
 	{
 		this.client = client;
 		this.apiBase = apiBase;
 		this.staticBase = staticBase;
+		this.gson = gson;
 	}
 
 	public ItemPrice[] getPrices() throws IOException
@@ -83,7 +85,7 @@ public class ItemClient
 			}
 
 			InputStream in = response.body().byteStream();
-			return RuneLiteAPI.GSON.fromJson(new InputStreamReader(in, StandardCharsets.UTF_8), ItemPrice[].class);
+			return gson.fromJson(new InputStreamReader(in, StandardCharsets.UTF_8), ItemPrice[].class);
 		}
 		catch (JsonParseException ex)
 		{
@@ -95,7 +97,6 @@ public class ItemClient
 	{
 		HttpUrl.Builder urlBuilder = staticBase.newBuilder()
 			.addPathSegment("item")
-			// TODO: Change this to stats.min.json later after release is undeployed
 			.addPathSegment("stats.ids.min.json");
 
 		HttpUrl url = urlBuilder.build();
@@ -118,7 +119,7 @@ public class ItemClient
 			final Type typeToken = new TypeToken<Map<Integer, ItemStats>>()
 			{
 			}.getType();
-			return RuneLiteAPI.GSON.fromJson(new InputStreamReader(in, StandardCharsets.UTF_8), typeToken);
+			return gson.fromJson(new InputStreamReader(in, StandardCharsets.UTF_8), typeToken);
 		}
 		catch (JsonParseException ex)
 		{

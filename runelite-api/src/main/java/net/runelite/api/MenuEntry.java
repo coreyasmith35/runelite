@@ -25,6 +25,9 @@
 package net.runelite.api;
 
 import java.util.function.Consumer;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import net.runelite.api.widgets.Widget;
 
 /**
  * A menu entry in a right-click menu.
@@ -79,6 +82,9 @@ public interface MenuEntry
 	boolean isForceLeftClick();
 	MenuEntry setForceLeftClick(boolean forceLeftClick);
 
+	int getWorldViewId();
+	MenuEntry setWorldViewId(int worldViewId);
+
 	/**
 	 * Deprioritized menus are sorted in the menu to be below the other menu entries.
 	 * @return
@@ -92,4 +98,86 @@ public interface MenuEntry
 	 * @return
 	 */
 	MenuEntry onClick(Consumer<MenuEntry> callback);
+
+	/**
+	 * Get the callback called when the menu option is clicked
+	 * @return
+	 */
+	Consumer<MenuEntry> onClick();
+
+	/**
+	 * Test if this menu entry is an item op. "Use" and "Examine" are not considered item ops.
+	 * @return
+	 */
+	boolean isItemOp();
+
+	/**
+	 * If this menu entry is an item op, get the item op id
+	 * @return 1-5
+	 */
+	int getItemOp();
+
+	/**
+	 * Get the item id
+	 * @return
+	 * @see net.runelite.api.gameval.ItemID
+	 */
+	int getItemId();
+
+	/**
+	 * Set the item id
+	 * @param itemId
+	 * @return
+	 */
+	MenuEntry setItemId(int itemId);
+
+	/**
+	 * Get the widget this menu entry is on, if this is a menu entry
+	 * with an associated widget. Such as eg, CC_OP.
+	 * @return
+	 */
+	@Nullable
+	Widget getWidget();
+
+	/**
+	 * Get the {@link NPC} this menu entry is targeting, if any.
+	 * @return
+	 */
+	@Nullable
+	NPC getNpc();
+
+	/**
+	 * Get the {@link Player} this menu entry is targeting, if any.
+	 * @return
+	 */
+	@Nullable
+	Player getPlayer();
+
+	/**
+	 * Get the {@link Actor} this menu entry is targeting, if any.
+	 * @return
+	 */
+	@Nullable
+	Actor getActor();
+
+	/**
+	 * Get the submenu for this menu entry.
+	 * @return the submenu, or null if one doesn't exist
+	 * @see #createSubMenu()
+	 */
+	@Nullable
+	Menu getSubMenu();
+
+	/**
+	 * Create a new submenu for this menu entry.
+	 * This will erase any previous submenu.
+	 * @return the new submenu
+	 */
+	@Nonnull
+	Menu createSubMenu();
+
+	/**
+	 * Remove the submenu from this menu entry.
+	 */
+	void deleteSubMenu();
 }

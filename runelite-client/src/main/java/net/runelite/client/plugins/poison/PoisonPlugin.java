@@ -37,8 +37,8 @@ import javax.inject.Inject;
 import lombok.Getter;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
-import net.runelite.api.SpriteID;
-import net.runelite.api.VarPlayer;
+import net.runelite.api.gameval.SpriteID;
+import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.api.events.VarbitChanged;
 import net.runelite.client.callback.ClientThread;
@@ -103,8 +103,6 @@ public class PoisonPlugin extends Plugin
 	private PoisonInfobox infobox;
 	private Instant poisonNaturalCure;
 	private Instant nextPoisonTick;
-	private int lastValue = -1;
-	private int lastDiseaseValue = -1;
 	private BufferedImage heart;
 
 	@Provides
@@ -139,8 +137,6 @@ public class PoisonPlugin extends Plugin
 		lastDamage = 0;
 		poisonNaturalCure = null;
 		nextPoisonTick = null;
-		lastValue = -1;
-		lastDiseaseValue = -1;
 
 		clientThread.invoke(this::resetHealthIcon);
 	}
@@ -148,10 +144,9 @@ public class PoisonPlugin extends Plugin
 	@Subscribe
 	public void onVarbitChanged(VarbitChanged event)
 	{
-		final int poisonValue = client.getVar(VarPlayer.POISON);
-		if (poisonValue != lastValue)
+		if (event.getVarpId() == VarPlayerID.POISON)
 		{
-			lastValue = poisonValue;
+			final int poisonValue = event.getValue();
 			nextPoisonTick = Instant.now().plus(Duration.of(POISON_TICK_MILLIS, ChronoUnit.MILLIS));
 
 			final int damage = nextDamage(poisonValue);
@@ -178,7 +173,7 @@ public class PoisonPlugin extends Plugin
 
 				if (damage > 0)
 				{
-					final BufferedImage image = getSplat(envenomed ? SpriteID.HITSPLAT_DARK_GREEN_VENOM : SpriteID.HITSPLAT_GREEN_POISON, damage);
+					final BufferedImage image = getSplat(envenomed ? SpriteID.Hitmark.HITSPLAT_DARK_GREEN_VENOM : SpriteID.Hitmark.HITSPLAT_GREEN_POISON, damage);
 
 					if (image != null)
 					{
@@ -190,11 +185,8 @@ public class PoisonPlugin extends Plugin
 
 			checkHealthIcon();
 		}
-
-		final int diseaseValue = client.getVar(VarPlayer.DISEASE_VALUE);
-		if (diseaseValue != lastDiseaseValue)
+		else if (event.getVarpId() == VarPlayerID.DISEASE)
 		{
-			lastDiseaseValue = diseaseValue;
 			checkHealthIcon();
 		}
 	}
@@ -305,7 +297,7 @@ public class PoisonPlugin extends Plugin
 		}
 
 		final BufferedImage newHeart;
-		final int poison = client.getVar(VarPlayer.IS_POISONED);
+		final int poison = client.getVarpValue(VarPlayerID.POISON);
 
 		if (poison >= VENOM_THRESHOLD)
 		{
@@ -315,7 +307,7 @@ public class PoisonPlugin extends Plugin
 		{
 			newHeart = HEART_POISON;
 		}
-		else if (client.getVar(VarPlayer.DISEASE_VALUE) > 0)
+		else if (client.getVarpValue(VarPlayerID.DISEASE) > 0)
 		{
 			newHeart = HEART_DISEASE;
 		}
@@ -330,7 +322,7 @@ public class PoisonPlugin extends Plugin
 		{
 			heart = newHeart;
 			client.getWidgetSpriteCache().reset();
-			client.getSpriteOverrides().put(SpriteID.MINIMAP_ORB_HITPOINTS_ICON, ImageUtil.getImageSpritePixels(heart, client));
+			client.getSpriteOverrides().put(SpriteID.OrbIcon.HITPOINTS, ImageUtil.getImageSpritePixels(heart, client));
 		}
 	}
 
@@ -342,7 +334,7 @@ public class PoisonPlugin extends Plugin
 		}
 
 		client.getWidgetSpriteCache().reset();
-		client.getSpriteOverrides().remove(SpriteID.MINIMAP_ORB_HITPOINTS_ICON);
+		client.getSpriteOverrides().remove(SpriteID.OrbIcon.HITPOINTS);
 		heart = null;
 	}
 }

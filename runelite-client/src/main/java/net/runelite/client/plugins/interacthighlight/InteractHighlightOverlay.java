@@ -35,10 +35,11 @@ import net.runelite.api.MenuEntry;
 import net.runelite.api.NPC;
 import net.runelite.api.Point;
 import net.runelite.api.TileObject;
+import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.widgets.WidgetUtil;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
-import net.runelite.client.ui.overlay.OverlayPriority;
 import net.runelite.client.ui.overlay.outline.ModelOutlineRenderer;
 import net.runelite.client.util.ColorUtil;
 
@@ -60,7 +61,7 @@ class InteractHighlightOverlay extends Overlay
 		this.modelOutlineRenderer = modelOutlineRenderer;
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.ABOVE_SCENE);
-		setPriority(OverlayPriority.HIGH);
+		setPriority(PRIORITY_HIGH);
 	}
 
 	@Override
@@ -84,8 +85,7 @@ class InteractHighlightOverlay extends Overlay
 
 		switch (menuAction)
 		{
-			case ITEM_USE_ON_GAME_OBJECT:
-			case SPELL_CAST_ON_GAME_OBJECT:
+			case WIDGET_TARGET_ON_GAME_OBJECT:
 			case GAME_OBJECT_FIRST_OPTION:
 			case GAME_OBJECT_SECOND_OPTION:
 			case GAME_OBJECT_THIRD_OPTION:
@@ -93,18 +93,18 @@ class InteractHighlightOverlay extends Overlay
 			case GAME_OBJECT_FIFTH_OPTION:
 			case EXAMINE_OBJECT:
 			{
+				int worldId = entry.getWorldViewId();
 				int x = entry.getParam0();
 				int y = entry.getParam1();
 				int id = entry.getIdentifier();
-				TileObject tileObject = plugin.findTileObject(x, y, id);
+				TileObject tileObject = plugin.findTileObject(worldId, x, y, id);
 				if (tileObject != null && config.objectShowHover() && (tileObject != plugin.getInteractedObject() || !config.objectShowInteract()))
 				{
 					modelOutlineRenderer.drawOutline(tileObject, config.borderWidth(), config.objectHoverHighlightColor(), config.outlineFeather());
 				}
 				break;
 			}
-			case ITEM_USE_ON_NPC:
-			case SPELL_CAST_ON_NPC:
+			case WIDGET_TARGET_ON_NPC:
 			case NPC_FIRST_OPTION:
 			case NPC_SECOND_OPTION:
 			case NPC_THIRD_OPTION:
@@ -112,11 +112,11 @@ class InteractHighlightOverlay extends Overlay
 			case NPC_FIFTH_OPTION:
 			case EXAMINE_NPC:
 			{
-				int id = entry.getIdentifier();
-				NPC npc = plugin.findNpc(id);
+				NPC npc = entry.getNpc();
 				if (npc != null && config.npcShowHover() && (npc != plugin.getInteractedTarget() || !config.npcShowInteract()))
 				{
-					Color highlightColor = menuAction == MenuAction.NPC_SECOND_OPTION || menuAction == MenuAction.SPELL_CAST_ON_NPC
+					Color highlightColor = menuAction == MenuAction.NPC_SECOND_OPTION
+						|| menuAction == MenuAction.WIDGET_TARGET_ON_NPC && WidgetUtil.componentToInterface(client.getSelectedWidget().getId()) == InterfaceID.MAGIC_SPELLBOOK
 						? config.npcAttackHoverHighlightColor() : config.npcHoverHighlightColor();
 					modelOutlineRenderer.drawOutline(npc, config.borderWidth(), highlightColor, config.outlineFeather());
 				}

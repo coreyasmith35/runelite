@@ -53,14 +53,11 @@ import net.runelite.api.Ignore;
 import net.runelite.api.MessageNode;
 import net.runelite.api.NameableContainer;
 import net.runelite.api.ScriptID;
-import net.runelite.api.VarClientStr;
-import net.runelite.api.Varbits;
 import net.runelite.api.clan.ClanChannel;
 import net.runelite.api.clan.ClanChannelMember;
 import net.runelite.api.clan.ClanRank;
 import net.runelite.api.clan.ClanSettings;
 import net.runelite.api.clan.ClanTitle;
-import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.ClanMemberJoined;
 import net.runelite.api.events.ClanMemberLeft;
 import net.runelite.api.events.FriendsChatChanged;
@@ -71,8 +68,10 @@ import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ScriptCallbackEvent;
 import net.runelite.api.events.ScriptPostFired;
 import net.runelite.api.events.VarClientStrChanged;
+import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.gameval.VarClientID;
+import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.widgets.Widget;
-import net.runelite.api.widgets.WidgetInfo;
 import net.runelite.api.widgets.WidgetType;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatMessageBuilder;
@@ -294,10 +293,10 @@ public class ChatChannelPlugin extends Plugin
 			return;
 		}
 
-		Widget chatList = client.getWidget(WidgetInfo.FRIENDS_CHAT_LIST);
+		Widget chatList = client.getWidget(InterfaceID.ChatchannelCurrent.LIST);
 		if (chatList != null)
 		{
-			Widget owner = client.getWidget(WidgetInfo.FRIENDS_CHAT_OWNER);
+			Widget owner = client.getWidget(InterfaceID.ChatchannelCurrent.CHANNELOWNER);
 			FriendsChatManager friendsChatManager = client.getFriendsChatManager();
 			if ((friendsChatManager == null || friendsChatManager.getCount() <= 0)
 				&& chatList.getChildren() == null && !Strings.isNullOrEmpty(owner.getText())
@@ -406,7 +405,7 @@ public class ChatChannelPlugin extends Plugin
 		int rankIcon = -1;
 
 		// Use configured friends chat info colors if set, otherwise default to the jagex text and fc name colors
-		if (client.isResized() && client.getVarbitValue(Varbits.TRANSPARENT_CHATBOX) == 1)
+		if (client.isResized() && client.getVarbitValue(VarbitID.CHATBOX_TRANSPARENCY) == 1)
 		{
 			textColor = MoreObjects.firstNonNull(chatColorConfig.transparentFriendsChatInfo(), CHAT_FC_TEXT_TRANSPARENT_BACKGROUND);
 			channelColor = MoreObjects.firstNonNull(chatColorConfig.transparentFriendsChatChannelName(), CHAT_FC_NAME_TRANSPARENT_BACKGROUND);
@@ -462,7 +461,7 @@ public class ChatChannelPlugin extends Plugin
 
 		final Color textColor;
 		// Use configured clan chat info colors if set, otherwise default to the jagex text and fc name colors
-		if (client.isResized() && client.getVarbitValue(Varbits.TRANSPARENT_CHATBOX) == 1)
+		if (client.isResized() && client.getVarbitValue(VarbitID.CHATBOX_TRANSPARENCY) == 1)
 		{
 			textColor = MoreObjects.firstNonNull(
 				chatType == MemberActivity.ChatType.CLAN_CHAT ? chatColorConfig.transparentClanChatInfo() : chatColorConfig.transparentClanChatGuestInfo(),
@@ -494,53 +493,10 @@ public class ChatChannelPlugin extends Plugin
 	@Subscribe
 	public void onVarClientStrChanged(VarClientStrChanged strChanged)
 	{
-		if (strChanged.getIndex() == VarClientStr.RECENT_FRIENDS_CHAT.getIndex() && config.recentChats())
+		if (strChanged.getIndex() == VarClientID.LAST_FRIENDSCHATJOIN && config.recentChats())
 		{
-			updateRecentChat(client.getVar(VarClientStr.RECENT_FRIENDS_CHAT));
+			updateRecentChat(client.getVarcStrValue(VarClientID.LAST_FRIENDSCHATJOIN));
 		}
-	}
-
-	@Subscribe
-	public void onChatMessage(ChatMessage chatMessage)
-	{
-		if (client.getGameState() != GameState.LOADING && client.getGameState() != GameState.LOGGED_IN)
-		{
-			return;
-		}
-
-		FriendsChatManager friendsChatManager = client.getFriendsChatManager();
-		if (friendsChatManager == null || friendsChatManager.getCount() == 0)
-		{
-			return;
-		}
-
-		switch (chatMessage.getType())
-		{
-			case PRIVATECHAT:
-			case MODPRIVATECHAT:
-				if (!config.privateMessageIcons())
-				{
-					return;
-				}
-				break;
-			case PUBLICCHAT:
-			case MODCHAT:
-				if (!config.publicChatIcons())
-				{
-					return;
-				}
-				break;
-			case FRIENDSCHAT:
-				if (!config.chatIcons())
-				{
-					return;
-				}
-				break;
-			default:
-				return;
-		}
-
-		insertRankIcon(chatMessage);
 	}
 
 	@Subscribe
@@ -583,13 +539,60 @@ public class ChatChannelPlugin extends Plugin
 				intStack[size - 1] = 1;
 
 				// Get name of player we are trying to kick
-				final String[] stringStack = client.getStringStack();
-				final int stringSize = client.getStringStackSize();
-				final String kickPlayerName = stringStack[stringSize - 1];
+				final Object[] objectStack = client.getObjectStack();
+				final int objectStackSize = client.getObjectStackSize();
+				final String kickPlayerName = (String) objectStack[objectStackSize - 1];
 
 				// Show a chatbox panel confirming the kick
 				clientThread.invokeLater(() -> confirmKickPlayer(kickPlayerName));
 				break;
+			}
+			case "chatMessageBuilding":
+			{
+				int uid = client.getIntStack()[client.getIntStackSize() - 1];
+				final MessageNode messageNode = client.getMessages().get(uid);
+				assert messageNode != null : "chat message build for unknown message";
+				final ChatMessageType messageType = messageNode.getType();
+
+				switch (messageType)
+				{
+					case PRIVATECHAT:
+					case MODPRIVATECHAT:
+						if (!config.privateMessageIcons())
+						{
+							return;
+						}
+						break;
+					case PUBLICCHAT:
+					case MODCHAT:
+						if (!config.publicChatIcons())
+						{
+							return;
+						}
+						break;
+					case FRIENDSCHAT:
+						if (!config.chatIcons())
+						{
+							return;
+						}
+						break;
+					default:
+						return;
+				}
+
+				final Object[] objectStack = client.getObjectStack();
+				final int objectStackSize = client.getObjectStackSize();
+				final String name = (String) objectStack[objectStackSize - 3];
+				final FriendsChatRank rank = getRank(Text.removeTags(name));
+				if (rank != null && rank != FriendsChatRank.UNRANKED)
+				{
+					int iconNumber = chatIconManager.getIconNumber(rank);
+					if (iconNumber > -1)
+					{
+						final String img = "<img=" + iconNumber + ">";
+						objectStack[objectStackSize - 3] = img + name;
+					}
+				}
 			}
 		}
 	}
@@ -605,47 +608,22 @@ public class ChatChannelPlugin extends Plugin
 			}
 
 			FriendsChatManager friendsChatManager = client.getFriendsChatManager();
-			Widget chatTitle = client.getWidget(WidgetInfo.FRIENDS_CHAT_TITLE);
+			Widget chatTitle = client.getWidget(InterfaceID.ChatchannelCurrent.CHANNELNAME);
 			if (friendsChatManager != null && friendsChatManager.getCount() > 0 && chatTitle != null)
 			{
-				chatTitle.setText(chatTitle.getText() + " (" + friendsChatManager.getCount() + "/100)");
+				chatTitle.setText(chatTitle.getText() + " (" + friendsChatManager.getCount() + "/" + friendsChatManager.getSize() + ")");
 			}
 		}
 		else if (event.getScriptId() == ScriptID.CLAN_SIDEPANEL_DRAW)
 		{
 			if (config.clanChatShowOnlineMemberCount())
 			{
-				updateClanTitle(WidgetInfo.CLAN_HEADER, client.getClanChannel());
+				updateClanTitle(InterfaceID.ClansSidepanel.HEADER, client.getClanChannel());
 			}
 
 			if (config.guestClanChatShowOnlineMemberCount())
 			{
-				updateClanTitle(WidgetInfo.CLAN_GUEST_HEADER, client.getGuestClanChannel());
-			}
-		}
-	}
-
-	private void insertRankIcon(final ChatMessage message)
-	{
-		final FriendsChatRank rank = getRank(Text.removeTags(message.getName()));
-
-		if (rank != null && rank != FriendsChatRank.UNRANKED)
-		{
-			int iconNumber = chatIconManager.getIconNumber(rank);
-			if (iconNumber > -1)
-			{
-				final String img = "<img=" + iconNumber + ">";
-				if (message.getType() == ChatMessageType.FRIENDSCHAT)
-				{
-					message.getMessageNode()
-						.setSender(message.getMessageNode().getSender() + " " + img);
-				}
-				else
-				{
-					message.getMessageNode()
-						.setName(img + message.getMessageNode().getName());
-				}
-				client.refreshChat();
+				updateClanTitle(InterfaceID.ClansGuestSidepanel.HEADER, client.getGuestClanChannel());
 			}
 		}
 	}
@@ -664,7 +642,7 @@ public class ChatChannelPlugin extends Plugin
 
 	private void rebuildFriendsChat()
 	{
-		Widget chat = client.getWidget(WidgetInfo.FRIENDS_CHAT_ROOT);
+		Widget chat = client.getWidget(InterfaceID.ChatchannelCurrent.UNIVERSE);
 		if (chat == null)
 		{
 			return;
@@ -676,8 +654,8 @@ public class ChatChannelPlugin extends Plugin
 
 	private void loadFriendsChats()
 	{
-		Widget chatOwner = client.getWidget(WidgetInfo.FRIENDS_CHAT_OWNER);
-		Widget chatList = client.getWidget(WidgetInfo.FRIENDS_CHAT_LIST);
+		Widget chatOwner = client.getWidget(InterfaceID.ChatchannelCurrent.CHANNELOWNER);
+		Widget chatList = client.getWidget(InterfaceID.ChatchannelCurrent.LIST);
 		if (chatList == null || chatOwner == null)
 		{
 			return;
@@ -740,7 +718,7 @@ public class ChatChannelPlugin extends Plugin
 
 	private void colorIgnoredPlayers(Color ignoreColor)
 	{
-		Widget chatList = client.getWidget(WidgetInfo.FRIENDS_CHAT_LIST);
+		Widget chatList = client.getWidget(InterfaceID.ChatchannelCurrent.LIST);
 		if (chatList == null || chatList.getChildren() == null)
 		{
 			return;
@@ -765,7 +743,7 @@ public class ChatChannelPlugin extends Plugin
 	{
 		clientThread.invokeLater(() ->
 		{
-			Widget w = client.getWidget(WidgetInfo.CLAN_LAYER);
+			Widget w = client.getWidget(InterfaceID.ClansSidepanel.UNIVERSE);
 			if (w != null)
 			{
 				client.runScript(w.getOnVarTransmitListener());
@@ -774,7 +752,7 @@ public class ChatChannelPlugin extends Plugin
 
 		clientThread.invokeLater(() ->
 		{
-			Widget w = client.getWidget(WidgetInfo.CLAN_GUEST_LAYER);
+			Widget w = client.getWidget(InterfaceID.ClansGuestSidepanel.UNIVERSE);
 			if (w != null)
 			{
 				client.runScript(w.getOnVarTransmitListener());
@@ -782,7 +760,7 @@ public class ChatChannelPlugin extends Plugin
 		});
 	}
 
-	private void updateClanTitle(WidgetInfo widget, ClanChannel channel)
+	private void updateClanTitle(int widget, ClanChannel channel)
 	{
 		Widget header = client.getWidget(widget);
 		if (header != null && channel != null)

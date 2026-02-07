@@ -25,6 +25,7 @@
  */
 package net.runelite.client.plugins.skillcalculator;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -36,17 +37,28 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.text.NumberFormat;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
+import javax.inject.Inject;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import javax.swing.border.EmptyBorder;
 import net.runelite.api.Client;
 import net.runelite.api.Experience;
 import net.runelite.api.Skill;
-import net.runelite.api.VarPlayer;
+import net.runelite.api.WorldType;
+import net.runelite.api.annotations.Varp;
+import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.SpriteManager;
@@ -60,7 +72,14 @@ import net.runelite.client.ui.components.IconTextField;
 
 class SkillCalculator extends JPanel
 {
-	private static final int MAX_XP = 200_000_000;
+	static final int MAX_XP_MULTIPLIER = 32;
+	private static final JLabel EMPTY_PANEL = new JLabel("No F2P actions to show.");
+
+	static
+	{
+		EMPTY_PANEL.setHorizontalAlignment(SwingConstants.CENTER);
+		EMPTY_PANEL.setBorder(new EmptyBorder(50, 0, 0, 0));
+	}
 
 	private final UICalculatorInputArea uiInput;
 	private final Client client;
@@ -70,7 +89,7 @@ class SkillCalculator extends JPanel
 	private final List<UIActionSlot> uiActionSlots = new ArrayList<>();
 	private final UICombinedActionSlot combinedActionSlot;
 	private final ArrayList<UIActionSlot> combinedActionSlots = new ArrayList<>();
-	private final List<JCheckBox> bonusCheckBoxes = new ArrayList<>();
+	private final Map<SkillBonus, JCheckBox> bonusCheckBoxes = new HashMap<>();
 	private final IconTextField searchBar = new IconTextField();
 
 	private CalculatorType currentCalculator;
@@ -78,8 +97,10 @@ class SkillCalculator extends JPanel
 	private int currentXP = Experience.getXpForLevel(currentLevel);
 	private int targetLevel = currentLevel + 1;
 	private int targetXP = Experience.getXpForLevel(targetLevel);
-	private float xpFactor = 1;
+	private int xpMultiplier = 1;
+	private final Set<SkillBonus> currentBonuses = new HashSet<>();
 
+	@Inject
 	SkillCalculator(Client client, ClientThread clientThread, UICalculatorInputArea uiInput, SpriteManager spriteManager, ItemManager itemManager)
 	{
 		this.client = client;
@@ -121,29 +142,29 @@ class SkillCalculator extends JPanel
 
 		uiInput.getUiFieldTargetLevel().addActionListener(e -> onFieldTargetLevelUpdated());
 		uiInput.getUiFieldTargetXP().addActionListener(e -> onFieldTargetXPUpdated());
+		uiInput.getUiFieldXPMultiplier().addChangeListener(e -> onFieldXPMultiplierUpdated());
 
 		// Register focus listeners to calculate xp when exiting a text field
 		uiInput.getUiFieldCurrentLevel().addFocusListener(buildFocusAdapter(e -> onFieldCurrentLevelUpdated()));
 		uiInput.getUiFieldCurrentXP().addFocusListener(buildFocusAdapter(e -> onFieldCurrentXPUpdated()));
 		uiInput.getUiFieldTargetLevel().addFocusListener(buildFocusAdapter(e -> onFieldTargetLevelUpdated()));
 		uiInput.getUiFieldTargetXP().addFocusListener(buildFocusAdapter(e -> onFieldTargetXPUpdated()));
+		uiInput.getUiFieldXPMultiplier().addFocusListener(buildFocusAdapter(e -> onFieldXPMultiplierUpdated()));
 	}
 
-	void openCalculator(CalculatorType calculatorType)
+	void openCalculator(CalculatorType calculatorType, boolean forceReload)
 	{
 		// Update internal skill/XP values.
 		currentXP = client.getSkillExperience(calculatorType.getSkill());
 		currentLevel = Experience.getLevelForXp(currentXP);
 
-		if (currentCalculator != calculatorType)
+		if (forceReload || currentCalculator != calculatorType)
 		{
 			currentCalculator = calculatorType;
+			currentBonuses.clear();
 
-			// Reset the XP factor, removing bonuses.
-			xpFactor = 1;
-
-			VarPlayer endGoalVarp = endGoalVarpForSkill(calculatorType.getSkill());
-			int endGoal = client.getVar(endGoalVarp);
+			@Varp int endGoalVarp = endGoalVarpForSkill(calculatorType.getSkill());
+			int endGoal = client.getVarpValue(endGoalVarp);
 			if (endGoal != -1)
 			{
 				targetLevel = Experience.getLevelForXp(endGoal);
@@ -164,8 +185,11 @@ class SkillCalculator extends JPanel
 			// Clear the combined action slots
 			clearCombinedSlots();
 
-			// Add in checkboxes for available skill bonuses.
-			renderBonusOptions();
+			// Add in checkboxes for available skill bonuses if we're not on a F2P world.
+			if (client.getWorldType().contains(WorldType.MEMBERS))
+			{
+				renderBonusOptions();
+			}
 
 			// Add the combined action slot.
 			add(combinedActionSlot);
@@ -241,45 +265,78 @@ class SkillCalculator extends JPanel
 			JPanel checkboxPanel = buildCheckboxPanel(bonus);
 
 			add(checkboxPanel);
-			add(Box.createRigidArea(new Dimension(0, 5)));
+		}
+
+		if (skillBonuses.length > 0)
+		{
+			add(Box.createRigidArea(new Dimension(0, 4)));
 		}
 	}
 
 	private JPanel buildCheckboxPanel(SkillBonus bonus)
 	{
 		JPanel uiOption = new JPanel(new BorderLayout());
-		JLabel uiLabel = new JLabel(bonus.getName());
+		JLabel uiLabel = new JLabel(generateDisplayNameForBonus(bonus));
 		JCheckBox uiCheckbox = new JCheckBox();
 
 		uiLabel.setForeground(Color.WHITE);
 		uiLabel.setFont(FontManager.getRunescapeSmallFont());
 
-		uiOption.setBorder(BorderFactory.createEmptyBorder(3, 7, 3, 0));
-		uiOption.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		uiOption.setBorder(BorderFactory.createEmptyBorder(1, 7, 1, 0));
 
 		// Adjust XP bonus depending on check-state of the boxes.
 		uiCheckbox.addActionListener(event -> adjustCheckboxes(uiCheckbox, bonus));
 
-		uiCheckbox.setBackground(ColorScheme.MEDIUM_GRAY_COLOR);
-
 		uiOption.add(uiLabel, BorderLayout.WEST);
 		uiOption.add(uiCheckbox, BorderLayout.EAST);
-		bonusCheckBoxes.add(uiCheckbox);
+		bonusCheckBoxes.put(bonus, uiCheckbox);
 
 		return uiOption;
 	}
 
+	private static String generateDisplayNameForBonus(SkillBonus bonus)
+	{
+		return bonus.getName() + " (" + formatBonusPercentage(bonus.getValue()) + "%)";
+	}
+
+	@VisibleForTesting
+	static String formatBonusPercentage(float bonus)
+	{
+		final int bonusValue = Math.round(10_000 * bonus);
+		final float bonusPercent = bonusValue / 100f;
+		final int bonusPercentInt = (int) bonusPercent;
+
+		if (bonusPercent == bonusPercentInt)
+		{
+			return String.valueOf(bonusPercentInt);
+		}
+		else
+		{
+			return String.valueOf(bonusPercent);
+		}
+	}
+
 	private void adjustCheckboxes(JCheckBox target, SkillBonus bonus)
 	{
-		for (JCheckBox otherSelectedCheckbox : bonusCheckBoxes)
+		// Check if target is stackable with any other bonuses
+		for (Map.Entry<SkillBonus, JCheckBox> entry : bonusCheckBoxes.entrySet())
 		{
-			if (otherSelectedCheckbox != target)
+			if (entry.getValue() != target && !entry.getKey().getCanBeStackedWith().contains(bonus))
 			{
-				otherSelectedCheckbox.setSelected(false);
+				currentBonuses.remove(entry.getKey());
+				entry.getValue().setSelected(false);
 			}
 		}
 
-		adjustXPBonus(target.isSelected() ? bonus.getValue() : 0f);
+		if (target.isSelected())
+		{
+			currentBonuses.add(bonus);
+		}
+		else
+		{
+			currentBonuses.remove(bonus);
+		}
+		calculate();
 	}
 
 	private void renderActionSlots()
@@ -303,7 +360,6 @@ class SkillCalculator extends JPanel
 
 			UIActionSlot slot = new UIActionSlot(action, clientThread, itemManager, uiIcon);
 			uiActionSlots.add(slot); // Keep our own reference.
-			add(slot); // Add component to the panel.
 
 			slot.addMouseListener(new MouseAdapter()
 			{
@@ -330,9 +386,37 @@ class SkillCalculator extends JPanel
 			});
 		}
 
-		// Refresh the rendering of this panel.
-		revalidate();
-		repaint();
+		if (client.getWorldType().contains(WorldType.MEMBERS))
+		{
+			// All actions should be visible, so no need to filter; just refresh the rendering of this panel.
+			uiActionSlots.forEach(this::add);
+			revalidate();
+			repaint();
+		}
+		else
+		{
+			// Filter out members actions due to being on F2P, then refresh the rendering
+			clientThread.invokeLater(() ->
+			{
+				List<UIActionSlot> membersActions = uiActionSlots.stream()
+					.filter(slot -> !slot.getAction().isMembers(itemManager))
+					.collect(Collectors.toList());
+
+				SwingUtilities.invokeLater(() ->
+				{
+					if (membersActions.isEmpty())
+					{
+						add(EMPTY_PANEL);
+					}
+					else
+					{
+						membersActions.forEach(this::add);
+					}
+					revalidate();
+					repaint();
+				});
+			});
+		}
 	}
 
 	private void calculate()
@@ -342,8 +426,15 @@ class SkillCalculator extends JPanel
 			int actionCount = 0;
 			int neededXP = targetXP - currentXP;
 			SkillAction action = slot.getAction();
-			final float bonus = action.isIgnoreBonus() ? 1f : xpFactor;
-			final int xp = Math.round(action.getXp() * bonus * 10f);
+			float bonus = 1f;
+			for (SkillBonus skillBonus : currentBonuses)
+			{
+				if (action.isBonusApplicable(skillBonus))
+				{
+					bonus *= skillBonus.getValue();
+				}
+			}
+			final int xp = (int) Math.floor(action.getXp() * 10f * bonus * xpMultiplier);
 
 			if (neededXP > 0)
 			{
@@ -383,12 +474,7 @@ class SkillCalculator extends JPanel
 		uiInput.setTargetLevelInput(targetLevel);
 		uiInput.setTargetXPInput(tXP);
 		uiInput.setNeededXP(nXP + " XP required to reach target XP");
-		calculate();
-	}
-
-	private void adjustXPBonus(float value)
-	{
-		xpFactor = 1 + value;
+		uiInput.setXPMultiplier(xpMultiplier);
 		calculate();
 	}
 
@@ -396,6 +482,12 @@ class SkillCalculator extends JPanel
 	{
 		currentLevel = enforceSkillBounds(uiInput.getCurrentLevelInput());
 		currentXP = Experience.getXpForLevel(currentLevel);
+		updateInputFields();
+	}
+
+	private void onFieldXPMultiplierUpdated()
+	{
+		xpMultiplier = enforceMultiplierBounds(uiInput.getXPMultiplierInput());
 		updateInputFields();
 	}
 
@@ -427,7 +519,12 @@ class SkillCalculator extends JPanel
 
 	private static int enforceXPBounds(int input)
 	{
-		return Math.min(MAX_XP, Math.max(0, input));
+		return Math.min(Experience.MAX_SKILL_XP, Math.max(0, input));
+	}
+
+	private static int enforceMultiplierBounds(int input)
+	{
+		return Math.min(MAX_XP_MULTIPLIER, Math.max(1, input));
 	}
 
 	private void onSearch()
@@ -465,56 +562,56 @@ class SkillCalculator extends JPanel
 		};
 	}
 
-	private static VarPlayer endGoalVarpForSkill(final Skill skill)
+	private static @Varp int endGoalVarpForSkill(final Skill skill)
 	{
 		switch (skill)
 		{
 			case ATTACK:
-				return VarPlayer.ATTACK_GOAL_END;
+				return VarPlayerID.XPDROPS_ATTACK_END;
 			case MINING:
-				return VarPlayer.MINING_GOAL_END;
+				return VarPlayerID.XPDROPS_MINING_END;
 			case WOODCUTTING:
-				return VarPlayer.WOODCUTTING_GOAL_END;
+				return VarPlayerID.XPDROPS_WOODCUTTING_END;
 			case DEFENCE:
-				return VarPlayer.DEFENCE_GOAL_END;
+				return VarPlayerID.XPDROPS_DEFENCE_END;
 			case MAGIC:
-				return VarPlayer.MAGIC_GOAL_END;
+				return VarPlayerID.XPDROPS_MAGIC_END;
 			case RANGED:
-				return VarPlayer.RANGED_GOAL_END;
+				return VarPlayerID.XPDROPS_RANGED_END;
 			case HITPOINTS:
-				return VarPlayer.HITPOINTS_GOAL_END;
+				return VarPlayerID.XPDROPS_HITPOINTS_END;
 			case AGILITY:
-				return VarPlayer.AGILITY_GOAL_END;
+				return VarPlayerID.XPDROPS_AGILITY_END;
 			case STRENGTH:
-				return VarPlayer.STRENGTH_GOAL_END;
+				return VarPlayerID.XPDROPS_STRENGTH_END;
 			case PRAYER:
-				return VarPlayer.PRAYER_GOAL_END;
+				return VarPlayerID.XPDROPS_PRAYER_END;
 			case SLAYER:
-				return VarPlayer.SLAYER_GOAL_END;
+				return VarPlayerID.XPDROPS_SLAYER_END;
 			case FISHING:
-				return VarPlayer.FISHING_GOAL_END;
+				return VarPlayerID.XPDROPS_FISHING_END;
 			case RUNECRAFT:
-				return VarPlayer.RUNECRAFT_GOAL_END;
+				return VarPlayerID.XPDROPS_RUNECRAFT_END;
 			case HERBLORE:
-				return VarPlayer.HERBLORE_GOAL_END;
+				return VarPlayerID.XPDROPS_HERBLORE_END;
 			case FIREMAKING:
-				return VarPlayer.FIREMAKING_GOAL_END;
+				return VarPlayerID.XPDROPS_FIREMAKING_END;
 			case CONSTRUCTION:
-				return VarPlayer.CONSTRUCTION_GOAL_END;
+				return VarPlayerID.XPDROPS_CONSTRUCTION_END;
 			case HUNTER:
-				return VarPlayer.HUNTER_GOAL_END;
+				return VarPlayerID.XPDROPS_HUNTER_END;
 			case COOKING:
-				return VarPlayer.COOKING_GOAL_END;
+				return VarPlayerID.XPDROPS_COOKING_END;
 			case FARMING:
-				return VarPlayer.FARMING_GOAL_END;
+				return VarPlayerID.XPDROPS_FARMING_END;
 			case CRAFTING:
-				return VarPlayer.CRAFTING_GOAL_END;
+				return VarPlayerID.XPDROPS_CRAFTING_END;
 			case SMITHING:
-				return VarPlayer.SMITHING_GOAL_END;
+				return VarPlayerID.XPDROPS_SMITHING_END;
 			case THIEVING:
-				return VarPlayer.THIEVING_GOAL_END;
+				return VarPlayerID.XPDROPS_THIEVING_END;
 			case FLETCHING:
-				return VarPlayer.FLETCHING_GOAL_END;
+				return VarPlayerID.XPDROPS_FLETCHING_END;
 			default:
 				throw new IllegalArgumentException();
 		}

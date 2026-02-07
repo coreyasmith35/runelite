@@ -27,7 +27,6 @@ package net.runelite.client.ui;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
-import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.event.WindowAdapter;
@@ -36,6 +35,7 @@ import java.awt.image.BufferedImage;
 import java.net.ConnectException;
 import java.net.UnknownHostException;
 import java.security.GeneralSecurityException;
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
@@ -45,7 +45,6 @@ import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
-import javax.swing.UIManager;
 import javax.swing.border.EmptyBorder;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.RuneLite;
@@ -72,19 +71,9 @@ public class FatalErrorDialog extends JDialog
 
 		try
 		{
-			UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());
-		}
-		catch (Exception e)
-		{
-		}
+			setIconImages(Arrays.asList(ClientUI.ICON_128, ClientUI.ICON_16));
 
-		UIManager.put("Button.select", ColorScheme.DARKER_GRAY_COLOR);
-
-		try
-		{
-			BufferedImage logo = ImageUtil.loadImageResource(FatalErrorDialog.class, "runelite_transparent.png");
-			setIconImage(logo);
-
+			BufferedImage logo = ImageUtil.loadImageResource(FatalErrorDialog.class, "runelite_splash.png");
 			JLabel runelite = new JLabel();
 			runelite.setIcon(new ImageIcon(logo));
 			runelite.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -108,7 +97,7 @@ public class FatalErrorDialog extends JDialog
 		setTitle("Fatal error starting RuneLite");
 		setLayout(new BorderLayout());
 
-		Container pane = getContentPane();
+		JPanel pane = (JPanel) getContentPane();
 		pane.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 
 		JPanel leftPane = new JPanel();
@@ -130,6 +119,7 @@ public class FatalErrorDialog extends JDialog
 		textArea.setWrapStyleWord(true);
 		textArea.setBorder(new EmptyBorder(10, 10, 10, 10));
 		textArea.setEditable(false);
+		textArea.setOpaque(false);
 		leftPane.add(textArea, BorderLayout.CENTER);
 
 		pane.add(leftPane, BorderLayout.CENTER);

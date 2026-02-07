@@ -24,6 +24,7 @@
  */
 package net.runelite.api;
 
+import javax.annotation.Nullable;
 import net.runelite.api.coords.LocalPoint;
 
 /**
@@ -31,6 +32,12 @@ import net.runelite.api.coords.LocalPoint;
  */
 public interface GraphicsObject extends Renderable
 {
+	/**
+	 * Get the {@link WorldEntity} this spotanim is on.
+	 * @return
+	 */
+	WorldView getWorldView();
+
 	/**
 	 * The graphics object ID.
 	 *
@@ -76,4 +83,17 @@ public interface GraphicsObject extends Renderable
 	 * @param finished
 	 */
 	void setFinished(boolean finished);
+
+	/**
+	 * The animation of the spotanim
+	 * @return
+	 */
+	@Nullable
+	Animation getAnimation();
+
+	/**
+	 * The frame of the current animation
+	 * @return
+	 */
+	int getAnimationFrame();
 }
