@@ -183,6 +183,7 @@ public class AudioSocketPlugin extends Plugin
 		if (source != null)
 		{
 			json.addProperty("sourceName", source.getName());
+			json.addProperty("sourceAnimation", source.getAnimation());
 		}
 
 		broadcast(gson.toJson(json));
@@ -209,6 +210,7 @@ public class AudioSocketPlugin extends Plugin
 		if (source != null)
 		{
 			json.addProperty("sourceName", source.getName());
+			json.addProperty("sourceAnimation", source.getAnimation());
 		}
 
 		broadcast(gson.toJson(json));
